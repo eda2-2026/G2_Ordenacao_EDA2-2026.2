@@ -1,0 +1,4 @@
+dados/dataset.csv
+resultados/
+__pycache__/
+*.pyc
