@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ordenação do catálogo — EDA2</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="envelope">
+
+  <header>
+    <h1>Ordenação do catálogo musical</h1>
+    <p class="subtitulo">
+      Estruturas de Dados 2 — T2. Merge Sort, Counting Sort e Radix LSD
+      executados ao vivo sobre o catálogo real.
+    </p>
+    <p class="resumo" id="resumo">carregando catálogo…</p>
+  </header>
+
+  <div class="abas" role="tablist">
+    <button class="aba" role="tab" aria-selected="true"  data-painel="catalogo">Catálogo</button>
+    <button class="aba" role="tab" aria-selected="false" data-painel="comparar">Comparar</button>
+    <button class="aba" role="tab" aria-selected="false" data-painel="escala">Escala</button>
+  </div>
+
+  <!-- ------------------------------------------------------------ -->
+  <section class="painel" id="painel-catalogo" role="tabpanel">
+
+    <div class="controles">
+      <div class="grupo">
+        <label for="cenario-catalogo">Tela</label>
+        <select id="cenario-catalogo">
+          <option value="popularidade">Top por popularidade</option>
+          <option value="duracao">Faixas mais longas</option>
+          <option value="biblioteca">Biblioteca (artista → álbum → faixa)</option>
+        </select>
+      </div>
+      <div class="grupo">
+        <label for="n-catalogo">Faixas</label>
+        <input type="range" id="n-catalogo" min="1000" max="50000" step="1000" value="10000">
+        <span class="valor-n" id="n-catalogo-valor">10.000</span>
+      </div>
+    </div>
+
+    <div class="metricas" id="metricas-catalogo"></div>
+    <div class="cartao">
+      <h2 id="titulo-catalogo"></h2>
+      <p class="nota" id="nota-catalogo"></p>
+      <div id="tabela-catalogo"><p class="carregando">ordenando…</p></div>
+    </div>
+
+  </section>
+
+  <!-- ------------------------------------------------------------ -->
+  <section class="painel" id="painel-comparar" role="tabpanel" hidden>
+
+    <div class="controles">
+      <div class="grupo">
+        <label for="cenario-comparar">Cenário</label>
+        <select id="cenario-comparar">
+          <option value="popularidade">Popularidade — inteiro 0..100</option>
+          <option value="duracao">Duração — inteiro até ~5.000.000</option>
+          <option value="biblioteca">Biblioteca — três strings</option>
+        </select>
+      </div>
+      <div class="grupo">
+        <label for="n-comparar">Faixas</label>
+        <input type="range" id="n-comparar" min="1000" max="50000" step="1000" value="10000">
+        <span class="valor-n" id="n-comparar-valor">10.000</span>
+      </div>
+    </div>
+
+    <div id="aviso-comparar"></div>
+    <div id="selo-comparar"></div>
+
+    <div class="cartao">
+      <h2>Tempo de execução</h2>
+      <p class="nota">Mesma entrada, mesmos elementos. Valores em milissegundos.</p>
+      <ul class="legenda" id="legenda-comparar"></ul>
+      <div id="barras-tempo"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Comparações entre elementos</h2>
+      <p class="nota">
+        Counting Sort e Radix LSD nunca comparam dois elementos: leem um valor
+        e o usam como índice de vetor. Por isso o contador fica em zero.
+      </p>
+      <ul class="legenda" id="legenda-comparacoes"></ul>
+      <div id="barras-comparacoes"></div>
+    </div>
+
+  </section>
+
+  <!-- ------------------------------------------------------------ -->
+  <section class="painel" id="painel-escala" role="tabpanel" hidden>
+
+    <div class="controles">
+      <div class="grupo">
+        <label for="cenario-escala">Cenário</label>
+        <select id="cenario-escala">
+          <option value="popularidade">Popularidade — Counting × Merge</option>
+          <option value="duracao">Duração — Radix × Merge</option>
+        </select>
+      </div>
+      <button class="acao" id="rodar-escala">Rodar</button>
+    </div>
+
+    <div class="cartao">
+      <h2>Tempo × n</h2>
+      <p class="nota">Cada ponto é uma execução real sobre uma amostra daquele tamanho.</p>
+      <ul class="legenda" id="legenda-escala"></ul>
+      <div id="grafico-escala"><p class="carregando">clique em Rodar.</p></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Comparações × n</h2>
+      <p class="nota">
+        A curva do Merge cresce como n log n. A do algoritmo não comparativo
+        fica no eixo, em zero, para qualquer n.
+      </p>
+      <ul class="legenda" id="legenda-escala-2"></ul>
+      <div id="grafico-escala-comp"><p class="carregando">clique em Rodar.</p></div>
+      <div id="tabela-escala"></div>
+    </div>
+
+  </section>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

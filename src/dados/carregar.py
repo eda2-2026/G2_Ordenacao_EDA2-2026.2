@@ -9,10 +9,8 @@ import random
 import sys
 from typing import List
 
-try:
-    from src.contrato import Faixa
-except ImportError:  # permite rodar o arquivo direto, sem pacote
-    from contrato import Faixa  # type: ignore
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from src.contrato import Faixa
 
 # Alguns campos do CSV excedem o limite padrão de tamanho do módulo csv.
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))

@@ -53,14 +53,39 @@ A contribuição não é "implementar Merge Sort". É:
 3. **Provar a estabilidade** dos três contra uma referência inquestionável
    antes de comparar tempos, porque um benchmark que compara saídas diferentes
    não mede nada;
-4. Mostrar o caso em que o algoritmo comparativo é a **única** opção, e não
+4. Tornar os algoritmos **observáveis em execução**, numa interface que roda as
+   funções reais do projeto e expõe as métricas de cada chamada;
+5. Mostrar o caso em que o algoritmo comparativo é a **única** opção, e não
    apenas o mais lento — a conclusão não é "o linear ganha", é que cada formato
    de chave pede um algoritmo.
 
 ## 3. O que o software faz
 
-Três cenários de ordenação sobre o mesmo catálogo carregado do CSV, cada um
-rodando o algoritmo que a tela correspondente usaria:
+O projeto entrega duas formas de executar os mesmos algoritmos: uma interface
+web, para inspeção interativa, e um benchmark de linha de comando, para a
+coleta sistemática que alimenta o relatório.
+
+### 3.1 Interface
+
+Servida por `src/web/servidor.py` em `http://localhost:8000`, com três abas:
+
+| Aba | O que faz |
+|---|---|
+| **Catálogo** | Ordena e lista as faixas pela tela escolhida. O rodapé mostra algoritmo, tempo, comparações e movimentações daquela execução. |
+| **Comparar** | Roda todos os algoritmos aplicáveis sobre a **mesma** entrada, confere que as saídas são idênticas e mostra tempo e comparações lado a lado. |
+| **Escala** | Executa em tamanhos crescentes e desenha tempo × n e comparações × n. |
+
+Um controle deslizante ajusta o número de faixas de 1.000 a 50.000, e cada
+mudança dispara uma execução nova.
+
+**A interface não reimplementa nada.** O servidor importa `merge_sort`,
+`counting_sort`, `radix_lsd` e `carregar` — exatamente os mesmos módulos que o
+benchmark usa — e os executa sob demanda com o contador `Metricas` ligado. Os
+números na tela são medições de verdade, não valores pré-computados. É essa
+propriedade que faz a interface valer como evidência: alterar um algoritmo
+altera a tela.
+
+### 3.2 Cenários
 
 | Cenário | Chave | Algoritmos comparados |
 |---|---|---|
@@ -69,12 +94,14 @@ rodando o algoritmo que a tela correspondente usaria:
 | `biblioteca` | três strings | Merge Sort multi-chave (sozinho) |
 
 O terceiro cenário não tem competidor **de propósito**: nem Counting nem Radix
-se aplicam a chave string, e o benchmark registra isso como resultado, não como
-lacuna.
+se aplicam a chave string, e a interface mostra isso como resultado — exibe o
+motivo da exclusão em vez de deixar a lacuna sem explicação.
 
-A suíte de testes (`tests/test_estabilidade.py`) valida os três contra o
-`sorted()` do CPython, que usa Timsort e é garantidamente estável por
-especificação da linguagem.
+### 3.3 Suíte de testes
+
+`tests/test_estabilidade.py` valida os três algoritmos contra o `sorted()` do
+CPython, que usa Timsort e é garantidamente estável por especificação da
+linguagem.
 
 ## 4. Núcleo técnico
 
@@ -179,6 +206,31 @@ teorema é sobre ordenação **por comparação**, e eles estão fora do escopo 
 hipótese. Em troca, pagam o preço de só funcionarem com chave inteira de
 intervalo tratável — que é exatamente a restrição que o Merge Sort não tem.
 
+### 4.5 Como a interface executa os algoritmos
+
+`src/web/servidor.py` expõe três rotas, todas chamando as funções originais:
+
+| Rota | O que executa |
+|---|---|
+| `/api/catalogo` | uma execução do algoritmo principal do cenário |
+| `/api/comparar` | todos os algoritmos do cenário sobre a mesma entrada, mais a verificação de equivalência |
+| `/api/escala` | uma execução por tamanho, para cada algoritmo |
+
+**Verificação de equivalência.** Antes de exibir qualquer tempo, a rota
+`/api/comparar` confere que as saídas dos algoritmos são idênticas elemento a
+elemento, **por identidade de objeto** (`is`, não `==`). Isso prova duas coisas
+ao mesmo tempo: que os algoritmos concordam, e que ambos são estáveis — duas
+ordenações estáveis da mesma entrada são necessariamente idênticas, inclusive
+nos empates. Se a verificação falhasse, os tempos não significariam nada.
+
+**Aquecimento.** O servidor executa cada algoritmo uma vez na subida, antes de
+atender a primeira requisição. Sem isso, a primeira medição exibida carregaria
+custos de inicialização do interpretador que não têm relação com o algoritmo.
+
+O catálogo é carregado uma única vez, na subida do servidor, e as amostras saem
+da mesma função `amostrar()` com semente fixa que o benchmark usa — então a
+interface e o benchmark medem exatamente as mesmas entradas.
+
 ## 5. Experimento
 
 Dataset: **Spotify Tracks Dataset**, 114.000 faixas, 125 gêneros.
@@ -194,6 +246,11 @@ atrapalhada pelo coletor de lixo distorce a média e não move a mediana.
 Linhas com `duration_ms <= 0` são descartadas na carga — existem no dataset e
 quebrariam o Radix, que exige chave não-negativa. São dados inválidos de origem,
 não decisão de conveniência.
+
+> **Sobre os números da interface.** A tela executa os algoritmos no momento do
+> clique e mostra o resultado daquela chamada única, sem repetição nem mediana.
+> Serve para inspeção e demonstração. Os valores das tabelas abaixo vêm do
+> `benchmark.py`, que repete e tira mediana — são esses que o relatório usa.
 
 ### 5.1 Validação de estabilidade
 
@@ -307,6 +364,12 @@ src/
 │   └── radix_lsd.py            Radix LSD, base parametrizável
 ├── dados/
 │   └── carregar.py             leitura do CSV + amostragem com semente
+├── web/
+│   ├── servidor.py             servidor HTTP, executa os algoritmos sob demanda
+│   └── static/
+│       ├── index.html          as três abas
+│       ├── estilo.css          paleta validada para daltonismo, claro e escuro
+│       └── app.js              gráficos em SVG, sem dependência externa
 ├── benchmark.py                medição dos três cenários
 └── graficos.py                 geração dos PNGs
 
@@ -319,9 +382,14 @@ dados/
 resultados/                     CSV e gráficos gerados pelo benchmark
 ```
 
+A pasta `src/web/` é estritamente aditiva: nenhuma assinatura dos módulos
+existentes foi alterada para acomodá-la.
+
 ## 8. Como executar
 
-**Pré-requisitos:** Python 3.10+ e matplotlib (só para os gráficos).
+**Pré-requisitos:** Python 3.10+. O matplotlib é necessário apenas para os
+gráficos estáticos do `graficos.py`; a interface não usa nenhuma dependência
+externa.
 
 Baixe o dataset do Kaggle e salve como `dados/dataset.csv`. Confirme a carga:
 
@@ -329,13 +397,24 @@ Baixe o dataset do Kaggle e salve como `dados/dataset.csv`. Confirme a carga:
 python src/dados/carregar.py
 ```
 
-Rode os testes:
+### 8.1 Interface
+
+```bash
+python src/web/servidor.py
+```
+
+O navegador abre em `http://localhost:8000`. Para parar, `Ctrl+C`.
+
+Se a porta 8000 estiver ocupada, altere a constante `PORTA` no topo de
+`src/web/servidor.py`.
+
+### 8.2 Testes
 
 ```bash
 python tests/test_estabilidade.py
 ```
 
-Rode o benchmark e gere os gráficos:
+### 8.3 Benchmark e gráficos
 
 ```bash
 python src/benchmark.py --rapido     # n até 10.000
@@ -353,10 +432,13 @@ Saída em `resultados/benchmark.csv`, `tempo-popularidade.png`,
 |---|---|---|
 | Contrato, Counting Sort, carga, benchmark, gráficos | João Pedro | `contrato.py`, `counting_sort.py`, `carregar.py`, `benchmark.py`, `graficos.py` |
 | Merge Sort, Radix LSD, testes de estabilidade | Rivadalvio | `merge_sort.py`, `radix_lsd.py`, `test_estabilidade.py` |
+| Interface | ambos | `web/servidor.py`, `web/static/` |
 
-A divisão é por arquivo, não por tarefa: cada integrante tem algoritmos que são
-seus de ponta a ponta e consegue testar sem depender do outro. A única
-dependência compartilhada é o `contrato.py`, commitado primeiro.
+A divisão dos algoritmos é por arquivo, não por tarefa: cada integrante tem
+algoritmos que são seus de ponta a ponta e consegue testar sem depender do
+outro. A única dependência compartilhada é o `contrato.py`, commitado primeiro.
+
+A interface veio depois dos dois blocos e consome ambos, por isso é conjunta.
 
 ## 10. Bibliografia
 
