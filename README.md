@@ -5,7 +5,7 @@
 **Trabalho:** T2 — Algoritmos de Ordenação
 **Dupla:** João Pedro Araújo de Freitas Lyra (232003661) e Rivadalvio Joaquim da Silva Filho (232024026)
 
-**Vídeo de apresentação:** _(a gravar)_
+**Vídeo de apresentação:** https://youtu.be/LLaiw2vLdsU
 
 ---
 
@@ -35,7 +35,7 @@ que preserve a ordem relativa dos empates. Com um algoritmo instável a tela sai
 **errada**: as faixas aparecem embaralhadas dentro de cada álbum. Não é um
 resultado mais lento, é um resultado incorreto.
 
-Sobre as 114.000 faixas do catálogo, isso significa que a escolha do algoritmo
+Sobre as 113.999 faixas do catálogo, isso significa que a escolha do algoritmo
 não é otimização prematura — é requisito funcional em um caso e ganho
 assintótico em dois.
 
@@ -233,7 +233,10 @@ interface e o benchmark medem exatamente as mesmas entradas.
 
 ## 5. Experimento
 
-Dataset: **Spotify Tracks Dataset**, 114.000 faixas, 125 gêneros.
+Dataset: **Spotify Tracks Dataset**, 125 gêneros. O arquivo traz 114.000
+linhas; uma é descartada na carga por ter `duration_ms` inválido, restando
+**113.999 faixas**, com 17.648 artistas e 46.589 álbuns distintos. Durações de
+8.586 a 5.237.295 ms.
 Fonte: https://www.kaggle.com/datasets/maharshipandya/-spotify-tracks-dataset
 
 Amostragem com semente fixa (`random.Random(42)`) — quem rodar o benchmark de
@@ -287,44 +290,95 @@ referência em vez de inspecionar a saída a olho.
 
 | n | Counting (ms) | Merge (ms) | ganho | comparações Counting | comparações Merge |
 |---|---|---|---|---|---|
-| 1.000 | _(a medir)_ | _(a medir)_ | — | 0 | _(a medir)_ |
-| 10.000 | _(a medir)_ | _(a medir)_ | — | 0 | _(a medir)_ |
-| 50.000 | _(a medir)_ | _(a medir)_ | — | 0 | _(a medir)_ |
-| 100.000 | _(a medir)_ | _(a medir)_ | — | 0 | _(a medir)_ |
+| 1.000 | 0,25 | 2,52 | 10,1× | 0 | 8.721 |
+| 5.000 | 1,78 | 16,96 | 9,5× | 0 | 55.122 |
+| 10.000 | 3,17 | 36,64 | 11,6× | 0 | 120.336 |
+| 25.000 | 7,53 | 97,43 | 12,9× | 0 | 334.041 |
+| 50.000 | 19,24 | 208,15 | 10,8× | 0 | 717.883 |
+| 100.000 | 43,77 | 452,91 | 10,3× | 0 | 1.535.664 |
+
+Três leituras:
+
+**O ganho é estável em torno de 10×.** Não cresce com n, e não deveria: ambos
+os algoritmos são lineares *na prática* para esta chave — o Counting por ser
+O(n+k) com k fixo, e o Merge por ser O(n log n) com log n variando pouco na
+faixa medida (de 10 a 17). O que separa os dois é o fator constante, e ele é
+constante mesmo.
+
+**As comparações do Merge batem com a teoria.** Dividindo a contagem medida por
+n·log₂(n), a razão vai de 0,875 a 0,925 e sobe devagar — exatamente o
+comportamento de n·log₂(n) − n + 1, que é a contagem exata do Merge Sort. O
+termo −n, que domina em n pequeno, perde peso conforme n cresce.
+
+**As movimentações do Counting são exatamente n.** Mil faixas, mil
+movimentações; cem mil faixas, cem mil movimentações. Cada elemento é escrito
+uma única vez, na posição que a soma de prefixos calculou. O Merge escreve
+1.668.928 vezes para as mesmas 100.000 faixas — dezesseis vezes mais, porque
+cada nível da recursão reescreve o vetor inteiro.
 
 ### 5.3 Ordenação por duração (k ≈ 5.000.000)
 
-| n | Radix (ms) | Merge (ms) | ganho | passadas do Radix |
-|---|---|---|---|---|
-| 1.000 | _(a medir)_ | _(a medir)_ | — | _(a medir)_ |
-| 10.000 | _(a medir)_ | _(a medir)_ | — | _(a medir)_ |
-| 50.000 | _(a medir)_ | _(a medir)_ | — | _(a medir)_ |
-| 100.000 | _(a medir)_ | _(a medir)_ | — | _(a medir)_ |
+| n | Radix (ms) | Merge (ms) | ganho | passadas | movimentações Radix | movimentações Merge |
+|---|---|---|---|---|---|---|
+| 1.000 | 1,86 | 2,67 | 1,44× | 7 | 7.000 | 9.976 |
+| 5.000 | 12,36 | 18,74 | 1,52× | 7 | 35.000 | 61.808 |
+| 10.000 | 28,05 | 38,31 | 1,37× | 7 | 70.000 | 133.616 |
+| 25.000 | 58,06 | 103,50 | 1,78× | 7 | 175.000 | 367.232 |
+| 50.000 | 173,99 | 229,44 | 1,32× | 7 | 350.000 | 784.464 |
+| 100.000 | 396,29 | 495,44 | 1,25× | 7 | 700.000 | 1.668.928 |
+
+**O resultado mais interessante do trabalho é este, e ele contraria a
+expectativa.** O Radix é O(n) e o Merge é O(n log n), mas o ganho medido fica
+entre 1,25× e 1,78× — contra os 10× do Counting, que tem a mesma complexidade
+assintótica linear.
+
+A explicação está no fator constante, e ela é instrutiva. A maior duração do
+catálogo é 5.237.295 ms, que tem 7 dígitos, então o Radix faz **7 passadas**
+completas. Cada passada percorre os n elementos três vezes: uma para contar,
+uma para somar prefixos, uma para distribuir — e em cada elemento chama a
+função extratora de chave e executa uma divisão inteira e um módulo.
+
+O resultado são 700.000 movimentações contra as 1.668.928 do Merge: só 2,4×
+menos, não a ordem de grandeza que "linear contra n log n" sugere. E as
+operações do Radix são individualmente mais caras em Python, onde cada chamada
+de função e cada operação aritmética passa pelo interpretador.
+
+A conclusão correta não é "o Radix decepcionou". É que **complexidade
+assintótica descreve o crescimento, não o custo**. Com d = 7 passadas e
+log₂(100.000) ≈ 17, o Radix executa 7 passadas onde o Merge executa 17 níveis —
+uma vantagem de pouco mais de 2×, não de uma ordem de grandeza. Para a
+vantagem assintótica aparecer de verdade seria preciso n muito maior, ou uma
+base maior que reduzisse o número de passadas.
+
+O contraste com a tabela anterior é o que fecha o argumento: o Counting faz
+**uma** passada e ganha 10×; o Radix faz **sete** e ganha 1,3×. Os dois são
+lineares. O número de passadas é o que decide.
 
 ### 5.4 Biblioteca multi-chave (artista → álbum → faixa)
 
 | n | Merge 3 chaves (ms) | comparações | movimentações |
 |---|---|---|---|
-| 1.000 | _(a medir)_ | _(a medir)_ | _(a medir)_ |
-| 10.000 | _(a medir)_ | _(a medir)_ | _(a medir)_ |
-| 100.000 | _(a medir)_ | _(a medir)_ | _(a medir)_ |
+| 1.000 | 12,69 | 25.919 | 29.928 |
+| 5.000 | 82,77 | 164.820 | 185.424 |
+| 10.000 | 177,38 | 359.346 | 400.848 |
+| 25.000 | 473,66 | 994.879 | 1.101.696 |
+| 50.000 | 1.023,11 | 2.133.820 | 2.353.392 |
+| 100.000 | 2.231,12 | 4.549.152 | 5.006.784 |
 
 Sem competidor: Counting e Radix não se aplicam a chave string.
 
-### 5.5 Efeito da base no Radix
+O custo é **exatamente três vezes** o de uma ordenação simples — as
+movimentações são 3n·log-alguma-coisa com a razão medida em 0,987 a 0,995 do
+triplo do Merge de chave única. Era o esperado: são três passadas completas, e
+cada uma custa o mesmo que uma ordenação inteira.
 
-| base | passadas | tempo em n=100.000 |
-|---|---|---|
-| 2 | _(a medir)_ | _(a medir)_ |
-| 10 | _(a medir)_ | _(a medir)_ |
-| 16 | _(a medir)_ | _(a medir)_ |
-| 256 | _(a medir)_ | _(a medir)_ |
-
-> As tabelas acima são preenchidas rodando `python src/benchmark.py`. A métrica
-> principal deste trabalho é a **contagem de operações**, não o tempo:
-> comparações e movimentações independem de máquina, de linguagem e de ruído do
-> sistema operacional. O tempo entra como confirmação, não como evidência
-> primária.
+Esse é o preço da ordenação multi-chave por passadas estáveis, e ele é
+assumido. A alternativa seria uma única passada com função de comparação
+composta (comparar artista, desempatar por álbum, desempatar por faixa), que
+faria um terço das passadas. Não a adotamos porque a versão em passadas é a que
+demonstra a propriedade sob estudo: cada passada depende da estabilidade da
+anterior, e é isso que o trabalho quer mostrar. Vale registrar que a decisão
+foi didática, não de desempenho.
 
 ## 6. Análise de complexidade
 
@@ -340,9 +394,16 @@ dígitos e b a base.
 Com k = 101 fixo, o Counting é O(n). Com d e b fixos (a duração sempre cabe em
 7 dígitos decimais), o Radix também é O(n).
 
+**O fator constante não aparece nesta tabela, e a seção 5.3 mostra por que isso
+importa.** Counting e Radix têm a mesma linha de complexidade, mas o Counting
+faz uma passada e o Radix faz sete — e o ganho medido difere por quase uma
+ordem de grandeza (10× contra 1,3×). A notação assintótica descarta
+deliberadamente esses fatores, e é por isso que a medição não substitui a
+análise nem a análise substitui a medição.
+
 **Por que não usamos os outros algoritmos do módulo.** Quick Sort e Heap Sort
 são instáveis, o que os elimina da tela da biblioteca — o caso que motivou o
-trabalho. Bubble, Selection e Insertion são O(n²) e inviáveis em 114.000
+trabalho. Bubble, Selection e Insertion são O(n²) e inviáveis em 113.999
 registros, embora o Insertion seja de fato o melhor algoritmo da lista para
 entrada quase ordenada, caso que não ocorre neste catálogo. Shell Sort é
 instável e tem complexidade dependente da sequência de incrementos, sem
